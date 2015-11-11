@@ -13,6 +13,7 @@
 #define LOCALSERVER "locallisten"
 #define PORT    5656
 #define MAXMSG  512
+
 /* stage 0: local listen
  * stage 1: check local listen
  * stage 2: create ssh connection
@@ -43,6 +44,34 @@ static void begin_listen()
 
 /* fast port reuse in 1 second*/
 #define CMD_PORT_REUSE "echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle"
+
+void check_locallisten()
+{
+	/* netstat -napt | grep 5656 | grep -v grep
+	 */
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		fprintf(stderr, "popen error!\n");
+		exit(0);
+	}
+
+	if (fgets(buf, BUFSIZ, pfp) == NULL) {
+		stage = 2;
+	}
+
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		fprintf(stderr, "buf:%s\n", buf);
+		memset(buf, 0, BUFSIZ);
+	}
+
+	pclose(pfp);
+	pfp = NULL;
+	fprintf(stderr, "local listen check!\n");
+}
 
 int main()
 {
