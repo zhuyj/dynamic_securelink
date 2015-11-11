@@ -10,132 +10,29 @@
 #include <string.h>
 #include <pthread.h>
 
+#define LOCALSERVER "locallisten"
 #define PORT    5656
 #define MAXMSG  512
 /* stage 0: local listen
  * stage 1: check local listen
  * stage 2: create ssh connection
  * stage 3: check ssh connection established
- * stage 4: check other clients connecting to this port 
+ * stage 4: check other clients connecting to this port
+ * stage 5: wait for 5 mintues, then disconnection ssh
  */
 static int stage = 0;
 
-static int read_from_client(int filedes)
-{
-	char buffer[MAXMSG];
-	int nbytes;
-
-	nbytes = read(filedes, buffer, MAXMSG);
-	if (nbytes < 0) {
-		/* Read error. */
-		perror("read");
-		exit(EXIT_FAILURE);
-	} else if (nbytes == 0)
-		/* End-of-file. */
-		return -1;
-	else {
-		/* Data read. */
-		fprintf(stderr, "Server: got message: `%s'\n", buffer);
-		return 0;
-	}
-}
-
-static int make_socket(uint16_t port)
-{
-	int sock;
-	struct sockaddr_in name;
-
-	/* Create the socket. */
-	sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (sock < 0) {
-		perror("socket");
-		exit(EXIT_FAILURE);
-	}
-
-	/* Give the socket a name. */
-	name.sin_family = AF_INET;
-	name.sin_port = htons(port);
-	name.sin_addr.s_addr = htonl(INADDR_ANY);
-	if (bind(sock, (struct sockaddr *)&name, sizeof(name)) < 0) {
-		perror("bind");
-		exit(EXIT_FAILURE);
-	}
-
-	return sock;
-}
-
-void *listen_input(void *data)
-{
-	int sock;
-	fd_set active_fd_set, read_fd_set;
-	int i;
-	struct sockaddr_in clientname;
-	size_t size;
-
-	/* Create the socket and set it up to accept connections. */
-	sock = make_socket(PORT);
-	if (listen(sock, 1) < 0) {
-		perror("listen");
-		exit(EXIT_FAILURE);
-	}
-
-	/* Initialize the set of active sockets. */
-	FD_ZERO(&active_fd_set);
-	FD_SET(sock, &active_fd_set);
-
-	while (1) {
-		/* Block until input arrives on one or more active sockets. */
-		read_fd_set = active_fd_set;
-		if (select(FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0) {
-			perror ("select");
-			exit (EXIT_FAILURE);
-		}
-
-		/* Service all the sockets with input pending. */
-		for (i = 0; i < FD_SETSIZE; ++i) {
-			if (FD_ISSET(i, &read_fd_set)) {
-				if (i == sock) {
-					/* Connection request on original socket. */
-					int new;
-					size = sizeof(clientname);
-					new = accept(sock, 
-							(struct sockaddr *) &clientname,
-							&size);
-					if (new < 0) {
-						perror("accept");
-						exit(EXIT_FAILURE);
-					}
-					fprintf(stderr,
-							"Server: connect from host %s, port %hd.\n",
-							inet_ntoa(clientname.sin_addr),
-							ntohs(clientname.sin_port));
-					FD_SET(new, &active_fd_set);
-
-					/* if a new connection, local listen should exit 
- 					*  and create the secure connection.
- 					*/
-					close(i);
-					stage = 2;
-					pthread_exit(0);
-				} else {
-					/* Data arriving on an already-connected socket. */
-					if (read_from_client(i) < 0) {
-						close(i);
-						FD_CLR(i, &active_fd_set);
-					}
-				}
-			}
-		}
-	}
-}
-
 static void begin_listen()
 {
-	pthread_t handle;
-	pthread_create(&handle, NULL, listen_input, NULL);
-	if (!pthread_detach(handle)) {
-		fprintf(stderr, "Thread detached successfully !!!\n");
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+	if (!getcwd(buf, BUFSIZ)) {
+		fprintf(stderr, "getcwd error!\n");
+		exit(0);
 	}
+	sprintf(cmdline, "%s/%s &", buf, LOCALSERVER);
+	fprintf(stderr, "%s\n", cmdline);
+	system(cmdline);
 }
 
 /* 5 seconds */
@@ -144,8 +41,13 @@ static void begin_listen()
 /* ssh connection script path */
 #define SSH_CONNECTION_PATH "/root/ssh_connection.sh"
 
+/* fast port reuse in 1 second*/
+#define CMD_PORT_REUSE "echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle"
+
 int main()
 {
+	/* make the port can be reused in 1 second */
+	system(CMD_PORT_REUSE);
 
 	/*main thread*/
 	while (1) {
@@ -171,19 +73,18 @@ int main()
 					exit(0);
 				}
 
+				if (fgets(buf, BUFSIZ, pfp) == NULL) {
+					stage = 2;
+				}
+
 				while (fgets(buf, BUFSIZ, pfp) != NULL) {
 					fprintf(stderr, "buf:%s\n", buf);
-					/* check LISTEN */
-					if (!strstr(buf, "LISTEN")) {
-						fprintf(stderr, "LISTEN!\n");
-						stage = 0;
-						break;
-					}
 					memset(buf, 0, BUFSIZ);
 				}
 
 				pclose(pfp);
 				pfp = NULL;
+				fprintf(stderr, "local listen check!\n");
 				break;
 			}
 			case 2:
@@ -204,14 +105,51 @@ int main()
 				}
 				pclose(pfp);
 				pfp = NULL;
+				fprintf(stderr, "ssh connection creation!\n");
 				stage = 3;
 				break;
 			}
 			case 3:
-				/* check ssh connection */
+			{
+				/* check ssh connection 
+				 * netstat -napt | grep :5656 | grep -v grep
+				 */
+				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+				FILE *pfp = NULL;
+
+				sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
+				pfp = popen(cmdline, "r");
+				if (NULL == pfp) {
+					fprintf(stderr, "popen error!\n");
+					exit(0);
+				}
+
+				while (fgets(buf, BUFSIZ, pfp) != NULL) {
+					fprintf(stderr, "buf:%s\n", buf);
+					/* check LISTEN */
+					if (!strstr(buf, "LISTEN")) {
+						fprintf(stderr, " No LISTEN!\n");
+					} else {
+						if (strstr(buf, "ssh")) {
+							fprintf(stderr, "ssh connection created!\n");
+							stage = 4;
+						}
+					}
+					memset(buf, 0, BUFSIZ);
+				}
+
+				pclose(pfp);
+				pfp = NULL;
+
+				fprintf(stderr, "ssh connection check!\n");
 				break;
+			}
 			case 4:
 				/* check other client connecting to this port */
+				fprintf(stderr, "client access ssh connection check!\n");
+				break;
+			case 5:
+				/* wait for 5 minutes, then disconnect ssh */
 			default:
 				fprintf(stderr, "stage is set wrong value!\n");
 		}
