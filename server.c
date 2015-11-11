@@ -73,6 +73,132 @@ void check_locallisten()
 	fprintf(stderr, "local listen check!\n");
 }
 
+void create_ssh_connection()
+{
+	/* create ssh connection */
+	FILE *pfp = NULL;
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	sprintf(cmdline, "sh %s", SSH_CONNECTION_PATH);
+	pfp = popen(cmdline, "r");
+	if (pfp == NULL) {
+		fprintf(stderr, "popen error!\n");
+		exit(0);
+	}
+
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		fprintf(stderr, "buf:%s\n", buf);
+		memset(buf, 0, BUFSIZ);
+	}
+	pclose(pfp);
+	pfp = NULL;
+	fprintf(stderr, "ssh connection creation!\n");
+	stage = 3;
+}
+
+void check_ssh_connection()
+{
+	/* check ssh connection 
+	 * netstat -napt | grep :5656 | grep -v grep
+	 */
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		fprintf(stderr, "popen error!\n");
+		exit(0);
+	}
+
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		fprintf(stderr, "buf:%s\n", buf);
+		/* check LISTEN */
+		if (!strstr(buf, "LISTEN")) {
+			fprintf(stderr, " No LISTEN!\n");
+		} else {
+			if (strstr(buf, "ssh")) {
+				fprintf(stderr, "ssh connection created!\n");
+				stage = 4;
+			}
+		}
+		memset(buf, 0, BUFSIZ);
+	}
+
+	pclose(pfp);
+	pfp = NULL;
+
+	fprintf(stderr, "ssh connection check!\n");
+}
+
+void check_client_access_ssh()
+{
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		fprintf(stderr, "popen error!\n");
+		exit(0);
+	}
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		fprintf(stderr, "buf:%s\n", buf);
+		if (strstr(buf, "ESTABLISHED")) {
+			fprintf(stderr, "some client is using!\n");
+		}
+		if (strstr(buf, "CLOSE_WAIT")) {
+			fprintf(stderr, "some client does not use it!\n");
+		}
+		if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
+			fprintf(stderr, "listening, no client using it!\n");
+			sleep(300);
+			stage = 5;
+		}
+	}
+	fprintf(stderr, "client access ssh connection check!\n");
+}
+
+void disconnect_ssh()
+{
+	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	/* wait for 10 minutes, then disconnect ssh */
+	sleep(600);
+	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		fprintf(stderr, "popen error!\n");
+		exit(0);
+	}
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		fprintf(stderr, "buf:%s\n", buf);
+		if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
+			FILE *tmp_fp = NULL;
+			fprintf(stderr, "listening, no client using it!\n");
+			sprintf(cmdline, "netstat -napt | grep :%d | grep LISTEN | awk -F \"LISTEN\" '{print $2}' | awk -F \"/\" '{print $1}' | tr -d ' '", PORT);
+			tmp_fp = popen(cmdline, "r");
+			if (NULL != tmp_fp) {
+				char tmp[BUFSIZ] = {0};
+				if (fgets(tmp, BUFSIZ, tmp_fp) != NULL) {
+					fprintf(stderr, "pid:%s\n", tmp);
+					if (strlen(tmp) > 0) {
+						char tmp_cmdline[256] = {0};
+						sprintf(tmp_cmdline, "kill -9 %s", tmp);
+						system(tmp_cmdline);
+					}
+				}
+			}
+			sleep(300);
+			stage = 5;
+		}
+	}
+
+	stage = 0;
+	fprintf(stderr, "client access ssh connection check!\n");
+
+}
+
 int main()
 {
 	/* make the port can be reused in 1 second */
@@ -90,156 +216,33 @@ int main()
 			case 1:
 			{
 				/* check local listen 
-				 * netstat -napt | grep 5656 | grep -v grep
 				 */
-				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				FILE *pfp = NULL;
-
-				sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
-				pfp = popen(cmdline, "r");
-				if (NULL == pfp) {
-					fprintf(stderr, "popen error!\n");
-					exit(0);
-				}
-
-				if (fgets(buf, BUFSIZ, pfp) == NULL) {
-					stage = 2;
-				}
-
-				while (fgets(buf, BUFSIZ, pfp) != NULL) {
-					fprintf(stderr, "buf:%s\n", buf);
-					memset(buf, 0, BUFSIZ);
-				}
-
-				pclose(pfp);
-				pfp = NULL;
-				fprintf(stderr, "local listen check!\n");
+				check_locallisten();
 				break;
 			}
 			case 2:
 			{
 				/* create ssh connection */
-				FILE *pfp = NULL;
-				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				sprintf(cmdline, "sh %s", SSH_CONNECTION_PATH);
-				pfp = popen(cmdline, "r");
-				if (pfp == NULL) {
-					fprintf(stderr, "popen error!\n");
-					exit(0);
-				}
-
-				while (fgets(buf, BUFSIZ, pfp) != NULL) {
-					fprintf(stderr, "buf:%s\n", buf);
-					memset(buf, 0, BUFSIZ);
-				}
-				pclose(pfp);
-				pfp = NULL;
-				fprintf(stderr, "ssh connection creation!\n");
-				stage = 3;
+				create_ssh_connection();
 				break;
 			}
 			case 3:
 			{
 				/* check ssh connection 
-				 * netstat -napt | grep :5656 | grep -v grep
 				 */
-				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				FILE *pfp = NULL;
-
-				sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
-				pfp = popen(cmdline, "r");
-				if (NULL == pfp) {
-					fprintf(stderr, "popen error!\n");
-					exit(0);
-				}
-
-				while (fgets(buf, BUFSIZ, pfp) != NULL) {
-					fprintf(stderr, "buf:%s\n", buf);
-					/* check LISTEN */
-					if (!strstr(buf, "LISTEN")) {
-						fprintf(stderr, " No LISTEN!\n");
-					} else {
-						if (strstr(buf, "ssh")) {
-							fprintf(stderr, "ssh connection created!\n");
-							stage = 4;
-						}
-					}
-					memset(buf, 0, BUFSIZ);
-				}
-
-				pclose(pfp);
-				pfp = NULL;
-
-				fprintf(stderr, "ssh connection check!\n");
+				check_ssh_connection();
 				break;
 			}
 			case 4:
 			{
 				/* check other client connecting to this port */
-				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				FILE *pfp = NULL;
-
-				sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
-				pfp = popen(cmdline, "r");
-				if (NULL == pfp) {
-					fprintf(stderr, "popen error!\n");
-					exit(0);
-				}
-				while (fgets(buf, BUFSIZ, pfp) != NULL) {
-					fprintf(stderr, "buf:%s\n", buf);
-					if (strstr(buf, "ESTABLISHED")) {
-						fprintf(stderr, "some client is using!\n");
-					}
-					if (strstr(buf, "CLOSE_WAIT")) {
-						fprintf(stderr, "some client does not use it!\n");
-					}
-					if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
-						fprintf(stderr, "listening, no client using it!\n");
-						sleep(300);
-						stage = 5;
-					}
-				}
-				fprintf(stderr, "client access ssh connection check!\n");
+				check_client_access_ssh();
 				break;
 			}
 			case 5:
 			{
-				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				FILE *pfp = NULL;
-
-				/* wait for 10 minutes, then disconnect ssh */
-				sleep(600);
-				sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
-				pfp = popen(cmdline, "r");
-				if (NULL == pfp) {
-					fprintf(stderr, "popen error!\n");
-					exit(0);
-				}
-				while (fgets(buf, BUFSIZ, pfp) != NULL) {
-					fprintf(stderr, "buf:%s\n", buf);
-					if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
-						FILE *tmp_fp = NULL;
-						fprintf(stderr, "listening, no client using it!\n");
-						sprintf(cmdline, "netstat -napt | grep :%d | grep LISTEN | awk -F \"LISTEN\" '{print $2}' | awk -F \"/\" '{print $1}' | tr -d ' '", PORT);
-						tmp_fp = popen(cmdline, "r");
-						if (NULL != tmp_fp) {
-							char tmp[BUFSIZ] = {0};
-							if (fgets(tmp, BUFSIZ, tmp_fp) != NULL) {
-								fprintf(stderr, "pid:%s\n", tmp);
-								if (strlen(tmp) > 0) {
-									char tmp_cmdline[256] = {0};
-									sprintf(tmp_cmdline, "kill -9 %s", tmp);
-									system(tmp_cmdline);
-								}
-							}
-						}
-						sleep(300);
-						stage = 5;
-					}
-				}
-
-				stage = 0;
-				fprintf(stderr, "client access ssh connection check!\n");
+				/*disconnect ssh connection*/
+				disconnect_ssh();
 				break;
 			}
 			default:
