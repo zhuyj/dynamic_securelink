@@ -141,6 +141,9 @@ static void begin_listen()
 /* 5 seconds */
 #define CHECK_INTERVAL 5
 
+/* ssh connection script path */
+#define SSH_CONNECTION_PATH "/root/ssh_connection.sh"
+
 int main()
 {
 
@@ -184,8 +187,26 @@ int main()
 				break;
 			}
 			case 2:
+			{
 				/* create ssh connection */
+				FILE *pfp = NULL;
+				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
+				sprintf(cmdline, "%s", SSH_CONNECTION_PATH);
+				pfp = popen(cmdline, "r");
+				if (pfp == NULL) {
+					fprintf(stderr, "popen error!\n");
+					exit(0);
+				}
+
+				while (fgets(buf, BUFSIZ, pfp) != NULL) {
+					fprintf(stderr, "buf:%s\n", buf);
+					memset(buf, 0, BUFSIZ);
+				}
+				pclose(pfp);
+				pfp = NULL;
+				stage = 3;
 				break;
+			}
 			case 3:
 				/* check ssh connection */
 				break;
