@@ -191,7 +191,7 @@ int main()
 				/* create ssh connection */
 				FILE *pfp = NULL;
 				char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-				sprintf(cmdline, "%s", SSH_CONNECTION_PATH);
+				sprintf(cmdline, "sh %s", SSH_CONNECTION_PATH);
 				pfp = popen(cmdline, "r");
 				if (pfp == NULL) {
 					fprintf(stderr, "popen error!\n");
