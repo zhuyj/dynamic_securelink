@@ -203,6 +203,15 @@ static void disconnect_ssh()
 	INFO_OUTPUT("client access ssh connection check!\n");
 }
 
+enum {
+	CREATE_LOCAL_LISTEN = 0,
+	CHECK_LOCAL_LISTEN,
+	CREATE_SSH_CONNECTION,
+	CHECK_SSH_CONNECTION,
+	CHECK_SSH_ACCESS,
+	DISCONNECT_SSH,
+};
+
 int main()
 {
 	/* make the port can be reused in 1 second */
@@ -211,31 +220,31 @@ int main()
 	/*main thread*/
 	while (1) {
 		switch(stage) {
-			case 0:
+			case CREATE_LOCAL_LISTEN:
 				/* create local listen */ 
 				begin_listen();
 				/* check local listen */
 				stage = 1;
 				break;
-			case 1:
+			case CHECK_LOCAL_LISTEN:
 				/* check local listen 
 				 */
 				check_locallisten();
 				break;
-			case 2:
+			case CREATE_SSH_CONNECTION:
 				/* create ssh connection */
 				create_ssh_connection();
 				break;
-			case 3:
+			case CHECK_SSH_CONNECTION:
 				/* check ssh connection 
 				 */
 				check_ssh_connection();
 				break;
-			case 4:
+			case CHECK_SSH_ACCESS:
 				/* check other client connecting to this port */
 				check_client_access_ssh();
 				break;
-			case 5:
+			case DISCONNECT_SSH:
 				/*disconnect ssh connection*/
 				disconnect_ssh();
 				break;
