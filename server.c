@@ -14,12 +14,21 @@
 #define PORT    5656
 #define MAXMSG  512
 
-/* stage 0: local listen
- * stage 1: check local listen
- * stage 2: create ssh connection
- * stage 3: check ssh connection established
- * stage 4: check other clients connecting to this port
- * stage 5: wait for 5 mintues, then disconnection ssh
+enum {
+	CREATE_LOCAL_LISTEN = 0,
+	CHECK_LOCAL_LISTEN,
+	CREATE_SSH_CONNECTION,
+	CHECK_SSH_CONNECTION,
+	CHECK_SSH_ACCESS,
+	DISCONNECT_SSH,
+};
+
+/* stage CREATE_LOCAL_LISTEN: local listen
+ * stage CHECK_LOCAL_LISTEN: check local listen
+ * stage CREATE_SSH_CONNECTION: create ssh connection
+ * stage CHECK_SSH_CONNECTION: check ssh connection established
+ * stage CHECK_SSH_ACCESS: check other clients connecting to this port
+ * stage DISCONNECT_SSH: wait for 5 mintues, then disconnection ssh
  */
 static int stage = 0;
 
@@ -65,7 +74,7 @@ static void check_locallisten()
 	}
 
 	if (fgets(buf, BUFSIZ, pfp) == NULL) {
-		stage = 2;
+		stage = CREATE_SSH_CONNECTION;
 	}
 
 	while (fgets(buf, BUFSIZ, pfp) != NULL) {
@@ -97,7 +106,7 @@ static void create_ssh_connection()
 	pclose(pfp);
 	pfp = NULL;
 	INFO_OUTPUT("ssh connection creation!\n");
-	stage = 3;
+	stage = CHECK_SSH_CONNECTION;
 }
 
 static void check_ssh_connection()
@@ -123,7 +132,7 @@ static void check_ssh_connection()
 		} else {
 			if (strstr(buf, "ssh")) {
 				INFO_OUTPUT("ssh connection created!\n");
-				stage = 4;
+				stage = CHECK_SSH_ACCESS;
 			}
 		}
 		memset(buf, 0, BUFSIZ);
@@ -157,7 +166,7 @@ static void check_client_access_ssh()
 		if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
 			INFO_OUTPUT("listening, no client using it!\n");
 			sleep(300);
-			stage = 5;
+			stage = DISCONNECT_SSH;
 		}
 	}
 	INFO_OUTPUT("client access ssh connection check!\n");
@@ -195,22 +204,12 @@ static void disconnect_ssh()
 				}
 			}
 			sleep(300);
-			stage = 5;
 		}
 	}
 
-	stage = 0;
+	stage = CREATE_LOCAL_LISTEN;
 	INFO_OUTPUT("client access ssh connection check!\n");
 }
-
-enum {
-	CREATE_LOCAL_LISTEN = 0,
-	CHECK_LOCAL_LISTEN,
-	CREATE_SSH_CONNECTION,
-	CHECK_SSH_CONNECTION,
-	CHECK_SSH_ACCESS,
-	DISCONNECT_SSH,
-};
 
 int main()
 {
@@ -224,7 +223,7 @@ int main()
 				/* create local listen */ 
 				begin_listen();
 				/* check local listen */
-				stage = 1;
+				stage = CHECK_LOCAL_LISTEN;
 				break;
 			case CHECK_LOCAL_LISTEN:
 				/* check local listen 
