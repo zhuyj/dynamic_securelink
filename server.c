@@ -50,7 +50,7 @@ static void begin_listen()
 /* fast port reuse in 1 second*/
 #define CMD_PORT_REUSE "echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle"
 
-void check_locallisten()
+static void check_locallisten()
 {
 	/* netstat -napt | grep 5656 | grep -v grep
 	 */
@@ -78,7 +78,7 @@ void check_locallisten()
 	INFO_OUTPUT("local listen check!\n");
 }
 
-void create_ssh_connection()
+static void create_ssh_connection()
 {
 	/* create ssh connection */
 	FILE *pfp = NULL;
@@ -100,7 +100,7 @@ void create_ssh_connection()
 	stage = 3;
 }
 
-void check_ssh_connection()
+static void check_ssh_connection()
 {
 	/* check ssh connection 
 	 * netstat -napt | grep :5656 | grep -v grep
@@ -135,7 +135,7 @@ void check_ssh_connection()
 	INFO_OUTPUT("ssh connection check!\n");
 }
 
-void check_client_access_ssh()
+static void check_client_access_ssh()
 {
 	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
 	FILE *pfp = NULL;
@@ -163,7 +163,7 @@ void check_client_access_ssh()
 	INFO_OUTPUT("client access ssh connection check!\n");
 }
 
-void disconnect_ssh()
+static void disconnect_ssh()
 {
 	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
 	FILE *pfp = NULL;
@@ -201,7 +201,6 @@ void disconnect_ssh()
 
 	stage = 0;
 	INFO_OUTPUT("client access ssh connection check!\n");
-
 }
 
 int main()
@@ -219,37 +218,27 @@ int main()
 				stage = 1;
 				break;
 			case 1:
-			{
 				/* check local listen 
 				 */
 				check_locallisten();
 				break;
-			}
 			case 2:
-			{
 				/* create ssh connection */
 				create_ssh_connection();
 				break;
-			}
 			case 3:
-			{
 				/* check ssh connection 
 				 */
 				check_ssh_connection();
 				break;
-			}
 			case 4:
-			{
 				/* check other client connecting to this port */
 				check_client_access_ssh();
 				break;
-			}
 			case 5:
-			{
 				/*disconnect ssh connection*/
 				disconnect_ssh();
 				break;
-			}
 			default:
 				INFO_OUTPUT("stage is set wrong value!\n");
 		}
