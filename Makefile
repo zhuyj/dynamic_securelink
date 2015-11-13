@@ -1,6 +1,6 @@
 #CFLAGS=-DDEBUG_MODE
-CFLAGS=
-all: server.c
+CFLAGS= -lpthread
+all: server.c local_listen.c dynamic_securelink.h
 	gcc -o server server.c ${CFLAGS}
 	gcc -o locallisten local_listen.c
 clean::
