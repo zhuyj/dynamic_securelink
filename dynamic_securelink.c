@@ -20,18 +20,20 @@
  * stage DISCONNECT_SSH: wait for 5 mintues, then disconnection ssh
  */
 static int stage = 0;
+static char locallisten_cmd[256] = {0};
 
 static void begin_listen()
 {
-	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
-	FILE *pfp = NULL;
-	if (!getcwd(buf, BUFSIZ)) {
-		INFO_OUTPUT("getcwd error!\n");
-		exit(0);
+	char buf[BUFSIZ] = {0};
+	if (strlen(locallisten_cmd) == 0) {
+		if (!getcwd(buf, BUFSIZ)) {
+			INFO_OUTPUT("getcwd error!\n");
+			exit(0);
+		}
+		sprintf(locallisten_cmd, "%s/%s &", buf, LOCALSERVER);
 	}
-	sprintf(cmdline, "%s/%s &", buf, LOCALSERVER);
-	INFO_OUTPUT("%s\n", cmdline);
-	system(cmdline);
+	INFO_OUTPUT("%s\n", locallisten_cmd);
+	system(locallisten_cmd);
 }
 
 static void check_locallisten()
@@ -178,14 +180,14 @@ static void disconnect_ssh()
 					}
 				}
 			}
-			sleep(300);
+//			sleep(300);
 		} else {
 			stage = CHECK_SSH_ACCESS;
 		}
 	}
 
 	stage = CREATE_LOCAL_LISTEN;
-	INFO_OUTPUT("client access ssh connection check!\n");
+	INFO_OUTPUT("disconnect ssh!\n");
 }
 
 int main()
