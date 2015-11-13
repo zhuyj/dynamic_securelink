@@ -102,8 +102,8 @@ static void check_ssh_connection()
 	while (fgets(buf, BUFSIZ, pfp) != NULL) {
 		INFO_OUTPUT("buf:%s\n", buf);
 		/* check LISTEN */
-		if (!strstr(buf, "LISTEN")) {
-			INFO_OUTPUT(" No LISTEN!\n");
+		if (!strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED")) {
+			INFO_OUTPUT(" LISTEN ESATBLISHED!\n");
 		} else {
 			if (strstr(buf, "ssh")) {
 				INFO_OUTPUT("ssh connection created!\n");
@@ -139,7 +139,7 @@ static void check_client_access_ssh()
 			INFO_OUTPUT("some client does not use it!\n");
 		}
 		if (strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED") && !strstr(buf, "CLOSE_WAIT")) {
-			INFO_OUTPUT("listening, no client using it!\n");
+			INFO_OUTPUT("check, listening, no client using it!\n");
 			sleep(300);
 			stage = DISCONNECT_SSH;
 		}
@@ -179,6 +179,8 @@ static void disconnect_ssh()
 				}
 			}
 			sleep(300);
+		} else {
+			stage = CHECK_SSH_ACCESS;
 		}
 	}
 
