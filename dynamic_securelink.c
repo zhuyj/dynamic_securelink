@@ -30,7 +30,7 @@ static void begin_listen()
 			INFO_OUTPUT("getcwd error!\n");
 			exit(0);
 		}
-		sprintf(locallisten_cmd, "%s/%s &", buf, LOCALSERVER);
+		sprintf(locallisten_cmd, "%s/%s", buf, LOCALSERVER);
 	}
 	INFO_OUTPUT("%s\n", locallisten_cmd);
 	system(locallisten_cmd);
@@ -180,7 +180,6 @@ static void disconnect_ssh()
 					}
 				}
 			}
-//			sleep(300);
 		} else {
 			stage = CHECK_SSH_ACCESS;
 		}

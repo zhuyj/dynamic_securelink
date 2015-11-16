@@ -59,6 +59,40 @@ static int make_socket(uint16_t port)
 	return sock;
 }
 
+static void daemon_local()
+{
+	pid_t process_id = 0;
+	pid_t sid = 0;
+	// Create child process
+	process_id = fork();
+	// Indication of fork() failure
+	if (process_id < 0) {
+		printf("fork failed!\n");
+		// Return failure in exit status
+		exit(1);
+	}
+	// PARENT PROCESS. Need to kill it.
+	if (process_id > 0) {
+		printf("process_id of child process %d \n", process_id);
+		// return success in exit status
+		exit(0);
+	}
+	//unmask the file mode
+	umask(0);
+	//set new session
+	sid = setsid();
+	if(sid < 0) {
+		// Return failure
+		exit(1);
+	}
+	// Change the current working directory to root.
+	chdir("/");
+	// Close stdin. stdout and stderr
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+}
+
 int main()
 {
 	int sock;
@@ -67,6 +101,7 @@ int main()
 	struct sockaddr_in clientname;
 	size_t size;
 
+	daemon_local();
 	/* Create the socket and set it up to accept connections. */
 	sock = make_socket(PORT);
 	if (listen(sock, 1) < 0) {
