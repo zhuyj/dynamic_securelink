@@ -100,8 +100,18 @@ int main()
 	int i;
 	struct sockaddr_in clientname;
 	size_t size;
+	FILE *fp = NULL;
 
 	daemon_local();
+
+	if ((fp=fopen("/var/run/locallisten.pid", "w")) == NULL) {
+		perror("open file error!\n");
+		exit(EXIT_FAILURE);
+	}
+
+	fprintf(fp, "%d", getpid());
+
+	fclose(fp);
 	/* Create the socket and set it up to accept connections. */
 	sock = make_socket(PORT);
 	if (listen(sock, 1) < 0) {
@@ -144,6 +154,7 @@ int main()
 					/* Connection come, quit! */
 					close(i);
 					FD_CLR(i, &active_fd_set);
+					remove("/var/run/locallisten.pid");
 					exit(0);
 				} else {
 					/* Data arriving on an already-connected socket. */

@@ -30,7 +30,7 @@ static void begin_listen()
 			INFO_OUTPUT("getcwd error!\n");
 			exit(0);
 		}
-		sprintf(locallisten_cmd, "%s/%s", buf, LOCALSERVER);
+		sprintf(locallisten_cmd, "setsid %s/%s &", buf, LOCALSERVER);
 	}
 	INFO_OUTPUT("%s\n", locallisten_cmd);
 	system(locallisten_cmd);
@@ -146,6 +146,8 @@ static void check_client_access_ssh()
 			stage = DISCONNECT_SSH;
 		}
 	}
+	pclose(pfp);
+	pfp = NULL;
 	INFO_OUTPUT("client access ssh connection check!\n");
 }
 
@@ -180,11 +182,14 @@ static void disconnect_ssh()
 					}
 				}
 			}
+			pclose(tmp_fp);
+			tmp_fp = NULL;
 		} else {
 			stage = CHECK_SSH_ACCESS;
 		}
 	}
-
+	pclose(pfp);
+	pfp = NULL;
 	stage = CREATE_LOCAL_LISTEN;
 	INFO_OUTPUT("disconnect ssh!\n");
 }
