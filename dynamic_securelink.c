@@ -10,6 +10,12 @@
 #include <string.h>
 #include <pthread.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+// int stat(const char *path, struct stat *buf);
+
 #include "dynamic_securelink.h"
 
 /* stage CREATE_LOCAL_LISTEN: local listen
@@ -156,8 +162,6 @@ static void disconnect_ssh()
 	char cmdline[256] = {0}, buf[BUFSIZ] = {0};
 	FILE *pfp = NULL;
 
-	/* wait for 10 minutes, then disconnect ssh */
-	sleep(600);
 	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
 	pfp = popen(cmdline, "r");
 	if (NULL == pfp) {
@@ -194,10 +198,58 @@ static void disconnect_ssh()
 	INFO_OUTPUT("disconnect ssh!\n");
 }
 
+void cleanup_ssh()
+{
+	FILE *tmp_fp = NULL;
+	char cmdline[256] = {0};
+
+	sprintf(cmdline, "netstat -napt | grep :%d | grep LISTEN | awk -F \"LISTEN\" '{print $2}' | awk -F \"/\" '{print $1}' | tr -d ' '", PORT);
+	tmp_fp = popen(cmdline, "r");
+	if (NULL != tmp_fp) {
+		char tmp[BUFSIZ] = {0};
+		if (fgets(tmp, BUFSIZ, tmp_fp) != NULL) {
+			INFO_OUTPUT("pid:%s\n", tmp);
+			if (strlen(tmp) > 0) {
+				char tmp_cmdline[256] = {0};
+				sprintf(tmp_cmdline, "kill -9 %s", tmp);
+				system(tmp_cmdline);
+			}   
+		}  
+	} 
+	pclose(tmp_fp);
+	tmp_fp = NULL;
+}
+
+void cleanup_locallisten()
+{
+	int retval = access("/var/run/locallisten.pid", F_OK);
+	FILE *fp = NULL;
+	char tmp[16] = {0}, cmdline[256] = {0};
+
+	if (retval != -1) {
+		fp = fopen("/var/run/locallisten.pid", "r");
+		if (NULL != fp) {
+			fscanf(fp, "%s", tmp);
+		}
+		fclose(fp);
+		if (strlen(tmp) > 0) {
+			sprintf(cmdline, "kill -9 %s\n", tmp);
+			system(cmdline);
+			system("killall -9 locallisten");
+		}
+	}
+}
+
 int main()
 {
 	/* make the port can be reused in 1 second */
 	system(CMD_PORT_REUSE);
+
+	/* disconnect ssh connection after main function exit */
+	atexit(cleanup_ssh);
+
+	/* make locallisten exit after main function exit */
+	atexit(cleanup_locallisten);
 
 	/*main thread*/
 	while (1) {
@@ -227,6 +279,8 @@ int main()
 				check_client_access_ssh();
 				break;
 			case DISCONNECT_SSH:
+				/* wait for 10 minutes, then disconnect ssh */
+				sleep(600);
 				/*disconnect ssh connection*/
 				disconnect_ssh();
 				break;
