@@ -280,7 +280,7 @@ int main()
 				break;
 			case DISCONNECT_SSH:
 				/* wait for 10 minutes, then disconnect ssh */
-				sleep(600);
+				sleep(3600);
 				/*disconnect ssh connection*/
 				disconnect_ssh();
 				break;
