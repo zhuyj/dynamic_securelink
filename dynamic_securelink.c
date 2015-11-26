@@ -92,6 +92,10 @@ static void create_ssh_connection()
 	stage = CHECK_SSH_CONNECTION;
 }
 
+/* check 10 times */
+#define CHECK_COUNT			 12
+static int check_ssh_connection_count = 0;
+
 static void check_ssh_connection()
 {
 	/* check ssh connection 
@@ -111,7 +115,11 @@ static void check_ssh_connection()
 		INFO_OUTPUT("buf:%s\n", buf);
 		/* check LISTEN */
 		if (!strstr(buf, "LISTEN") && !strstr(buf, "ESTABLISHED")) {
-			INFO_OUTPUT(" LISTEN ESATBLISHED!\n");
+			INFO_OUTPUT("NO LISTEN ESATBLISHED!\n");
+			check_ssh_connection_count ++;
+			if (check_ssh_connection_count >= CHECK_COUNT) {
+				stage = CREATE_SSH_CONNECTION;
+			}
 		} else {
 			if (strstr(buf, "ssh")) {
 				INFO_OUTPUT("ssh connection created!\n");
