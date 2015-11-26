@@ -140,6 +140,13 @@ static void check_client_access_ssh()
 	}
 	while (fgets(buf, BUFSIZ, pfp) != NULL) {
 		INFO_OUTPUT("buf:%s\n", buf);
+
+		/* check ssh connection exist or not */
+		if (!strstr(buf, "LISTEN")) {
+			/* ssh connection does not exist */
+			stage = CREATE_SSH_CONNECTION;
+		}
+
 		if (strstr(buf, "ESTABLISHED")) {
 			INFO_OUTPUT("some client is using!\n");
 		}
@@ -208,7 +215,7 @@ void cleanup_ssh()
 	if (NULL != tmp_fp) {
 		char tmp[BUFSIZ] = {0};
 		if (fgets(tmp, BUFSIZ, tmp_fp) != NULL) {
-			INFO_OUTPUT("pid:%s\n", tmp);
+			INFO_OUTPUT("clean ssh pid:%s\n", tmp);
 			if (strlen(tmp) > 0) {
 				char tmp_cmdline[256] = {0};
 				sprintf(tmp_cmdline, "kill -9 %s", tmp);
