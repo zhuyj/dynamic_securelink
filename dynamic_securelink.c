@@ -138,6 +138,7 @@ static void check_client_access_ssh()
 {
 	char cmdline[BUF_LEN] = {0}, buf[BUFSIZ] = {0};
 	FILE *pfp = NULL;
+	int listen_exist = 0;
 
 	sprintf(cmdline, "netstat -napt | grep :%d | grep -v grep", PORT);
 	pfp = popen(cmdline, "r");
@@ -149,9 +150,11 @@ static void check_client_access_ssh()
 		INFO_OUTPUT("buf:%s\n", buf);
 
 		/* check ssh connection exist or not */
-		if (!strstr(buf, "LISTEN")) {
+		if ((!strstr(buf, "LISTEN")) && !listen_exist) {
 			/* ssh connection does not exist */
 			stage = CREATE_SSH_CONNECTION;
+		} else {
+			listen_exist = 1;
 		}
 
 		if (strstr(buf, "ESTABLISHED")) {
