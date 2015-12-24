@@ -110,6 +110,11 @@ static void check_ssh_connection()
 		exit(0);
 	}
 
+	if (fgets(buf, BUFSIZ, pfp) == NULL) {
+		stage = CREATE_SSH_CONNECTION;
+		INFO_OUTPUT("NO LISTEN ESATBLISHED!\n");
+	}
+
 	while (fgets(buf, BUFSIZ, pfp) != NULL) {
 		INFO_OUTPUT("buf:%s\n", buf);
 		/* check LISTEN */
