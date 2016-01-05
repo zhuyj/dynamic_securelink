@@ -1,5 +1,5 @@
 #!/bin/sh
-IPADDRESS=`hostname -I`
+IPADDRESS=`hostname -I | tr -d ' '`
 SSH_EXISTS=`ps uxww | grep ${IPADDRESS}:5656 | grep -v grep`
 if [ -z "${SSH_EXISTS}" ]; then
 	echo "ssh tunnel error!"
