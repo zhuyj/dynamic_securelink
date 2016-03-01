@@ -41,6 +41,34 @@ static void begin_listen()
 	system(locallisten_cmd);
 }
 
+static void proc_tcp_check_locallisten()
+{
+	/* grep "1618 00000000:0000 0A" /proc/net/tcp 
+	 */
+	char cmdline[BUF_LEN] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	sprintf(cmdline, "grep \"%x 00000000:0000 0A\" /proc/net/tcp", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		INFO_OUTPUT("popen error!\n");
+		exit(0);
+	}
+
+	if (fgets(buf, BUFSIZ, pfp) == NULL) {
+		stage = CREATE_SSH_CONNECTION;
+	}
+
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		INFO_OUTPUT("buf:%s\n", buf);
+		memset(buf, 0, BUFSIZ);
+	}
+
+	pclose(pfp);
+	pfp = NULL;
+	INFO_OUTPUT("local listen check!\n");
+}
+
 static void check_locallisten()
 {
 	/* netstat -napt | grep 5656 | grep -v grep
@@ -287,7 +315,8 @@ int main()
 			case CHECK_LOCAL_LISTEN:
 				/* check local listen 
 				 */
-				check_locallisten();
+				//check_locallisten();
+				proc_tcp_check_locallisten();
 				break;
 
 			case CREATE_SSH_CONNECTION:
