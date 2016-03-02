@@ -119,9 +119,56 @@ static void create_ssh_connection()
 	stage = CHECK_SSH_CONNECTION;
 }
 
+/* TCP state:
+	"Unused", 	0
+	"Established", 	1
+	"Syn Sent", 	2
+	"Syn Recv", 	3
+	"Fin Wait 1", 	4
+	"Fin Wait 2", 	5
+	"Time Wait",  	6
+	"Close", 	7
+        "Close Wait", 	8
+	"Last ACK", 	9
+	"Listen", 	10
+	"Closing" 	11
+*/
 /* check 10 times */
 #define CHECK_COUNT			 12
 static int check_ssh_connection_count = 0;
+
+static void proc_tcp_check_ssh_connection()
+{
+	/* check ssh connection 
+	 * grep ":1618 " /proc/net/tcp
+	 */
+	char cmdline[BUF_LEN] = {0}, buf[BUFSIZ] = {0};
+	FILE *pfp = NULL;
+
+	sprintf(cmdline, "grep \"%x 00000000:0000 0A\" /proc/net/tcp", PORT);
+	pfp = popen(cmdline, "r");
+	if (NULL == pfp) {
+		INFO_OUTPUT("popen error!\n");
+		exit(0);
+	}
+
+	if (fgets(buf, BUFSIZ, pfp) == NULL) {
+		stage = CREATE_SSH_CONNECTION;
+		INFO_OUTPUT("NO LISTEN ESATBLISHED!\n");
+	}
+
+	while (fgets(buf, BUFSIZ, pfp) != NULL) {
+		INFO_OUTPUT("buf:%s\n", buf);
+		INFO_OUTPUT("ssh connection created!\n");
+		stage = CHECK_SSH_ACCESS;
+		memset(buf, 0, BUFSIZ);
+	}
+
+	pclose(pfp);
+	pfp = NULL;
+
+	INFO_OUTPUT("ssh connection check!\n");
+}
 
 static void check_ssh_connection()
 {
@@ -327,7 +374,8 @@ int main()
 			case CHECK_SSH_CONNECTION:
 				/* check ssh connection 
 				 */
-				check_ssh_connection();
+				//check_ssh_connection();
+				proc_tcp_check_ssh_connection();
 				break;
 
 			case CHECK_SSH_ACCESS:
