@@ -155,6 +155,10 @@ static void proc_tcp_check_ssh_connection()
 	if (fgets(buf, BUFSIZ, pfp) == NULL) {
 		stage = CREATE_SSH_CONNECTION;
 		INFO_OUTPUT("NO LISTEN ESATBLISHED!\n");
+	} else {
+		INFO_OUTPUT("buf:%s\n", buf);
+		stage = CHECK_SSH_ACCESS;
+		memset(buf, 0, BUFSIZ);
 	}
 
 	while (fgets(buf, BUFSIZ, pfp) != NULL) {
